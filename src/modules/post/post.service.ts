@@ -220,9 +220,149 @@ const getMyPosts = async (authorId: string) => {
   };
 };
 
+// user isfeatured update korte parbe na admin sob kisu update korte parbe
+const updatePost = async (
+  postId: string,
+  data: Partial<Post>,
+  authorId: string,
+  isAdmin: boolean
+) => {
+  const postData = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!isAdmin && postData.authorId !== authorId) {
+    throw new Error("You are not authorized to update this post");
+  }
+
+  if (!isAdmin) {
+    delete data.isFeatured;
+  }
+
+  return await prisma.post.update({
+    where: {
+      id: postId,
+    },
+    data: {
+      ...data,
+    },
+  });
+};
+
+const deletePost = async (
+  postId: string,
+  authorId: string,
+  isAdmin: boolean
+) => {
+  const postData = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!isAdmin && postData.authorId !== authorId) {
+    throw new Error("You are not authorized to update this post");
+  }
+
+  return await prisma.post.delete({
+    where: {
+      id: postId,
+    },
+  });
+};
+
+const getPostStats = async () => {
+  return await prisma.$transaction(async (tx) => {
+    const [
+      totalPosts,
+      publishedPosts,
+      draftPosts,
+      featuredPosts,
+      totalComments,
+      approvedComments,
+      totalUsers,
+      adminCount,
+      userCount,
+      totalViews,
+    ] = await Promise.all([
+      // 1
+      tx.post.count(),
+
+      // 2
+      tx.post.count({
+        where: { status: PostStatus.PUBLISHED },
+      }),
+
+      // 3
+      tx.post.count({
+        where: { status: PostStatus.DRAFT },
+      }),
+
+      // 4
+      tx.post.count({
+        where: { isFeatured: true },
+      }),
+
+      // 5
+      tx.comment.count(),
+
+      // 6
+      tx.comment.count({
+        where: { status: CommentStatus.APPROVED },
+      }),
+
+      // 7 ✅ TOTAL USERS
+      tx.user.count(),
+
+      // 8 ✅ ADMINS
+      tx.user.count({
+        where: { role: "ADMIN" },
+      }),
+
+      // 9 ✅ USERS
+      tx.user.count({
+        where: { role: "USER" },
+      }),
+      tx.post.aggregate({
+        _sum: {
+          views: true,
+        },
+      }),
+    ]);
+
+    console.log("Stats:", totalUsers, adminCount, userCount);
+
+    return {
+      totalPosts,
+      publishedPosts,
+      draftPosts,
+      featuredPosts,
+      totalComments,
+      approvedComments,
+      totalUsers,
+      adminCount,
+      userCount,
+      totalViews: totalViews._sum.views || 0,
+    };
+  });
+};
+
 export const postService = {
   createPost,
   getAllPost,
   getPostById,
   getMyPosts,
+  updatePost,
+  deletePost,
+  getPostStats,
 };
