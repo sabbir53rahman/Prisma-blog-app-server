@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { postService } from "./post.service";
 import { prisma } from "../../lib/prisma";
 import { error } from "node:console";
@@ -6,7 +6,7 @@ import { PostStatus } from "../../../generated/prisma/enums";
 import paginationSortingHelper from "../../helpers/paginationSortingHelper";
 import { UserRole } from "../../middlewares/auth";
 
-const createPost = async (req: Request, res: Response) => {
+const createPost = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
 
@@ -18,14 +18,7 @@ const createPost = async (req: Request, res: Response) => {
     const result = await postService.createPost(req.body, user.id);
     return res.status(201).json(result);
   } catch (error: any) {
-    console.log("POST CREATE ERROR >>>", error);
-
-    res.status(400).json({
-      success: false,
-      message: "Post creation failed",
-      error: error.message,
-      meta: error.meta,
-    });
+    next(error);
   }
 };
 
@@ -111,7 +104,7 @@ const getMyPosts = async (req: Request, res: Response) => {
   }
 };
 
-const updatePost = async (req: Request, res: Response) => {
+const updatePost = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
 
@@ -130,10 +123,7 @@ const updatePost = async (req: Request, res: Response) => {
     );
     res.status(200).json(result);
   } catch (err) {
-    res.status(400).json({
-      error: "post fetched failed",
-      details: err,
-    });
+   next(err);
   }
 };
 
